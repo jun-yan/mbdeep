@@ -1,0 +1,25 @@
+# manuscript
+*/*.aux
+*/*.bbl
+*/*.blg
+*/*.fdb_latexmk
+*/*.fls
+*/*.log
+*/*.out
+*/*.synctex.gz
+*/*.pdf
+
+# reference
+!reference/*.pdf
+
+# image
+!image/*.pdf
+
+# data
+.DS_Store
+*/.DS_Store
+.Rapp.history
+
+# main folder
+*.html
+.Rhistory
