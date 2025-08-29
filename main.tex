@@ -1,0 +1,271 @@
+\documentclass[12pt, titlepage, reqno]{article}
+\usepackage{authblk}
+\usepackage[margin=1in]{geometry}
+\RequirePackage{amsthm,amsmath,amsfonts,amssymb}
+\usepackage{array}
+\RequirePackage{natbib}
+\RequirePackage[colorlinks,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{booktabs,longtable}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{threeparttable}
+\usepackage{graphicx}
+\graphicspath{{./}{../image/}}
+\usepackage{xcolor}
+\usepackage{soul}
+\usepackage{epstopdf}
+\usepackage[inline]{enumitem}
+\usepackage{bm}
+\usepackage[ruled, lined]{algorithm2e}
+% \usepackage{algorithm}
+% \usepackage{algpseudocode}
+\usepackage{lineno}
+\linenumbers*[1]
+\usepackage{setspace}
+
+
+%% patches to make lineno work better with amsmath
+\newcommand*\patchAmsMathEnvironmentForLineno[1]{%
+	\expandafter\let\csname old#1\expandafter\endcsname\csname 
+	#1\endcsname
+	\expandafter\let\csname oldend#1\expandafter\endcsname\csname 
+	end#1\endcsname
+	\renewenvironment{#1}%
+	{\linenomath\csname old#1\endcsname}%
+	{\csname oldend#1\endcsname\endlinenomath}}%
+\newcommand*\patchBothAmsMathEnvironmentsForLineno[1]{%
+	\patchAmsMathEnvironmentForLineno{#1}%
+	\patchAmsMathEnvironmentForLineno{#1*}}%
+\AtBeginDocument{%
+	\patchBothAmsMathEnvironmentsForLineno{equation}%
+	\patchBothAmsMathEnvironmentsForLineno{align}%
+	\patchBothAmsMathEnvironmentsForLineno{flalign}%
+	\patchBothAmsMathEnvironmentsForLineno{alignat}%
+	\patchBothAmsMathEnvironmentsForLineno{gather}%
+	\patchBothAmsMathEnvironmentsForLineno{multline}%
+}
+
+\allowdisplaybreaks
+
+\title{Uncertainty Quantification in Deep Learning via Multiplier Bootstrap Methods}
+\author[1]{Jun Yan}
+
+\affil[1]{Department of Statistics, University of Connecticut, 
+Storrs, CT 06269, USA}
+
+\begin{document}
+	
+\maketitle
+	
+\begin{abstract}
+Uncertainty quantification is a critical component of deploying deep
+learning models in scientific and high-stakes applications. While deep
+neural networks can achieve remarkable predictive performance, their
+outputs often lack reliable measures of uncertainty, limiting their
+practical utility in decision making. Existing approaches, including
+Bayesian neural networks, ensemble methods, and calibration
+techniques, offer partial solutions but face challenges in balancing
+computational scalability with statistical validity. From a
+statistical standpoint, bootstrap and resampling methods provide
+well-established tools for quantifying uncertainty, yet their direct
+application to modern deep networks has been limited. This work
+investigates the use of multiplier bootstrap methods for uncertainty
+quantification in deep learning. By leveraging scalable approximations
+of estimating equations, we aim to develop practical procedures that
+deliver valid uncertainty assessments for predictions from complex
+models with millions of parameters. The proposed perspective seeks to
+bridge the gap between statistical theory and the pressing need for
+trustworthy uncertainty quantification in modern deep learning.
+
+
+\bigskip
+\noindent{\bf Keywords.}
+
+\end{abstract}
+
+\doublespacing
+
+\section{Introduction}
+\label{sec:intro}
+
+Uncertainty quantification is fundamental to the scientific use of
+machine learning and artificial intelligence. In high-stakes domains
+such as medical imaging, autonomous driving, and climate prediction,
+the reliability of model predictions is as important as their
+accuracy. Deep neural networks have achieved impressive predictive
+performance, yet their outputs often lack calibrated uncertainty
+measures. Without trustworthy quantification of prediction uncertainty,
+end users cannot meaningfully assess risk or make informed
+decisions. This limitation has raised concerns from both scientific
+and regulatory perspectives, highlighting the need for statistical
+frameworks that integrate uncertainty into deep learning methods
+\citep{kendall2017uncertainties, abdar2021review}.
+
+
+A growing literature has investigated uncertainty estimation in deep
+learning, spanning Bayesian neural networks, ensemble methods, and
+post-hoc calibration techniques. Bayesian approaches offer
+theoretically appealing formulations but are computationally
+demanding, especially for large-scale networks
+\citep{blundell2015weight, gal2016dropout}. Ensemble-based strategies
+improve robustness but require substantial computational resources
+\citep{lakshminarayanan2017simple}. Calibration methods such as
+temperature scaling are more efficient but limited in scope
+\citep{guo2017calibration}. Within medical imaging, most works focus
+on predictive accuracy while offering heuristic measures of
+uncertainty, often without rigorous statistical justification
+\citep{mehrtash2020confidence, huang2021confidence}. From a broader
+statistical perspective, methods for quantifying uncertainty in
+complex models have long been studied, including the bootstrap,
+multiplier resampling, and sandwich variance estimation
+\citep{efron1994introduction, lahiri2003resampling, zhou2012multiplier}.
+
+
+Despite these developments, there remains a gap between statistical
+theory and practical uncertainty quantification in deep learning. Most
+existing methods emphasize either computational feasibility or
+theoretical rigor, but rarely both. In particular, scalable statistical
+approaches that can provide valid uncertainty estimates for complex
+models with millions of parameters are still lacking. Furthermore,
+current evaluations largely emphasize prediction accuracy rather than
+the reliability of uncertainty measures. This paper aims to bridge
+these perspectives by exploring multiplier bootstrap methods in the
+context of deep learning, with the goal of developing practical,
+statistically principled approaches for uncertainty quantification.
+
+\section{Related Work}
+
+Uncertainty quantification in deep learning has been approached from
+several methodological directions. The most prominent stream builds on
+Bayesian formulations of neural networks, where weights are treated as
+random variables and posterior distributions are approximated. Methods
+such as variational inference and Monte Carlo dropout have been widely
+used to make Bayesian inference scalable to modern architectures
+\citep{blundell2015weight, gal2016dropout}. While these techniques
+provide a principled framework for incorporating prior information and
+posterior uncertainty, they remain computationally intensive, often
+requiring significant approximations. Consequently, their practical
+use has been largely confined to smaller models or settings where
+computational budgets are less restrictive.
+
+
+Another major line of work relies on ensembles of deep networks to
+quantify predictive uncertainty. By training multiple models with
+different initializations or data subsets, ensembles capture
+variability in predictions that can be interpreted as uncertainty
+\citep{lakshminarayanan2017simple}. Large-scale benchmarks under
+dataset shift consistently find ensembles competitive or superior to
+many approximate Bayesian methods and post-hoc calibration
+\citep{ovadia2019can}. Explanatory analyses attribute part of this
+advantage to functional diversity arising from distinct loss-landscape
+modes explored by independent initializations \citep{fort2019deep},
+while careful studies also document diminishing returns and metric
+pitfalls when comparing ensemble variants \citep{ashukha2020pitfalls}.
+Despite their strong empirical performance, ensembles incur training
+and memory costs that scale with the number of members and, as
+typically implemented, provide limited formal guarantees for interval
+coverage or variance estimation. These trade-offs motivate
+complementary approaches that retain statistical validation while
+remaining computationally practical at scale.
+
+
+Calibration methods form a third category, adjusting predictive
+probabilities to better align with observed frequencies. Temperature
+scaling offers a simple, effective post-hoc remedy for modern networks
+\citep{guo2017calibration}. Beyond this, principled binary and
+multiclass calibrators, including beta and Dirichlet calibration,
+improve probability estimates across diverse models
+\citep{kull2017beta, kull2019beyond}. For regression, calibrated
+intervals can be obtained by post-processing any model, including deep
+nets \citep{kuleshov2018accurate}. Training-time regularizers also
+affect calibration: label smoothing and mixup generally reduce
+overconfidence and improve expected calibration error
+\citep{muller2019when, thulasidasan2019mixup}. However, post-hoc
+calibration tuned on i.i.d.\ validation data may deteriorate under
+distribution shift, where methods that account for epistemic
+uncertainty (e.g., ensembles) tend to be more robust
+\citep{ovadia2019can}. These results underscore both the usefulness
+and the limitations of calibration as a comprehensive uncertainty
+quantification strategy.
+
+
+Conformal inference offers distribution-free predictive guarantees
+under minimal assumptions, furnishing set- or interval-valued outputs
+with finite-sample marginal coverage. Rooted in exchangeability and
+nonconformity scoring, conformal methods are algorithm-agnostic and
+scale naturally via data splitting \citep{vovk2005algorithmic,
+lei2018distribution, angelopoulos2023conformal}. For regression, split
+conformal intervals provide valid coverage broadly, while variants
+improve efficiency and adaptivity: conformalized quantile regression
+leverages conditional quantiles for heteroscedastic data
+\citep{romano2019conformalized}, and the jackknife+ uses leave-one-out
+predictions to sharpen coverage without fragile asymptotics
+\citep{barber2021predictive}. For classification, set-valued
+predictors control miscoverage while minimizing ambiguity, connecting
+to calibrated probability outputs. These properties make conformal
+methods attractive complements to probabilistic machine learning.
+
+
+Applications in deep learning have further demonstrated the
+feasibility of conformal approaches for modern high-dimensional
+models. Early work combined conformal predictors with neural networks
+to deliver valid uncertainty sets \citep{papadopoulos2007conformal}.
+Recent developments extend the framework to image classification,
+where predictive sets improve both calibration and interpretability
+\citep{angelopoulos2021uncertainty}, and to robustness under
+distributional shift \citep{stutz2022conformal}. Extensions with
+PAC-style guarantees enhance reliability in complex architectures
+\citep{park2022pac}. These advances show that conformal inference can
+be efficiently integrated into deep models while retaining rigorous
+coverage guarantees.
+
+
+From the statistical perspective, resampling-based methods have long
+served as a foundation for uncertainty assessment. The bootstrap
+\citep{efron1994introduction} and its extensions, including block
+bootstrap and resampling methods for dependent data
+\citep{lahiri2003resampling}, offer flexible and widely applicable
+tools. More recently, multiplier bootstrap techniques have been
+developed to provide computationally efficient alternatives that avoid
+explicit data resampling while retaining asymptotic validity
+\citep{zhou2012multiplier, chen2020jackknife}. These approaches have
+been successfully applied in high-dimensional regression, time series,
+and survival analysis, highlighting their adaptability and
+computational advantages. The question that naturally arises is
+whether such statistically principled methods can be effectively
+translated into the context of deep learning, where models often
+involve millions of parameters and nonconvex optimization landscapes.
+
+
+The preceding classes of methods highlight the breadth of approaches
+to uncertainty quantification in deep learning. Yet none fully resolve
+the central challenge of providing scalable, statistically justified
+uncertainty measures for highly overparameterized models. Bayesian and
+ensemble methods remain computationally demanding, calibration methods
+lack variance guarantees, and conformal inference, while powerful, is
+limited by exchangeability assumptions. Bootstrap and multiplier
+bootstrap methods, by contrast, offer theoretically grounded and
+computationally adaptable frameworks that have seen success in other
+high-dimensional problems. This motivates our investigation into how
+multiplier bootstrap techniques can be translated into the deep
+learning setting. In the next section, we outline how the structure of
+estimating equations in neural networks naturally connects to
+multiplier resampling, and how this connection can be exploited to
+develop practical procedures for uncertainty quantification.
+
+
+
+
+\bibliographystyle{chicago}
+\bibliography{refs}
+	
+\end{document}
+
+%%% LocalWords: assortativity
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% ispell-personal-dictionary: ".aspell.en.pws"
+%%% fill-column: 68
+%%% eval: (auto-fill-mode 1)
+%%% End:
