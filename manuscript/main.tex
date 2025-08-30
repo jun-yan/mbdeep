@@ -5,6 +5,8 @@
 \usepackage{array}
 \RequirePackage{natbib}
 \RequirePackage[colorlinks,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{algorithm}
+\usepackage{algorithmic}
 \usepackage{booktabs,longtable}
 \usepackage{tabularx}
 \usepackage{multirow}
@@ -16,7 +18,7 @@
 \usepackage{epstopdf}
 \usepackage[inline]{enumitem}
 \usepackage{bm}
-\usepackage[ruled, lined]{algorithm2e}
+
 % \usepackage{algorithm}
 % \usepackage{algpseudocode}
 \usepackage{lineno}
@@ -253,6 +255,121 @@ estimating equations in neural networks naturally connects to
 multiplier resampling, and how this connection can be exploited to
 develop practical procedures for uncertainty quantification.
 
+\section{Scalability and Computation}
+
+Implementing the multiplier bootstrap for deep learning requires
+scalable ways to approximate the functional expansion
+\[
+  \Delta T^{*} \approx
+  G(\hat\theta)\,H(\hat\theta)^{-1}\,g^{*},
+\]
+where $G(\hat\theta)=\nabla_\theta T(\hat\theta)$ is the gradient of
+the functional of interest and $g^{*}$ is the multiplier perturbation
+of the score. Direct computation is infeasible: the Hessian
+$H(\hat\theta)$ has dimension $p \times p$, with $p$ in the millions
+for modern networks, and cannot be formed or inverted explicitly.
+
+
+A practical alternative is to exploit Hessian--vector products (HVPs).
+For any vector $v\in\mathbb{R}^p$,
+\[
+  H(\hat\theta) v =
+  \nabla^2_\theta L_n(\hat\theta)\,v
+\]
+can be computed efficiently by automatic differentiation at a cost
+comparable to a single gradient evaluation. This makes it possible to
+apply iterative solvers that require only matrix–vector products,
+without ever constructing $H(\hat\theta)$.
+
+
+Two complementary strategies are available. In the \emph{adjoint
+approach}, one solves
+\[
+  H(\hat\theta) u = G(\hat\theta)^\top
+\]
+for $u$ using conjugate gradient with HVPs. Then each bootstrap
+replicate reduces to a single inner product,
+\[
+  \Delta T^{*(b)} \approx u^\top g^{*(b)}.
+\]
+This amortizes the cost of the CG solve across all replicates. In the
+\emph{forward approach}, one instead solves
+\[
+  H(\hat\theta) v^{*(b)} = g^{*(b)},
+\]
+and evaluates
+$\Delta T^{*(b)} = G(\hat\theta)^\top v^{*(b)}$. Although this requires
+a new CG solve per replicate, it avoids the need to compute
+$G(\hat\theta)$ explicitly when that gradient is very large.
+
+
+All necessary ingredients are already available in deep learning
+frameworks. Gradients of predictions with respect to parameters give
+$G(\hat\theta)$, while HVPs are standard operations in automatic
+differentiation. The score perturbations $g^{*(b)}$ can be formed at
+the mini-batch level by assigning multipliers to observations within
+each batch, ensuring scalability to large datasets. Thus no new
+primitives are needed beyond what is already used for training.
+
+
+The computational complexity depends on the number of CG iterations,
+say $K$. The adjoint approach requires $O(K \cdot C_{\text{HVP}})$
+work once, followed by inexpensive inner products for each replicate,
+while the forward approach requires $O(K \cdot C_{\text{HVP}})$ per
+replicate. In either case, this cost is far smaller than training an
+ensemble or sampling a Bayesian posterior, both of which require
+multiple full passes through the data. The multiplier bootstrap
+therefore offers a statistically principled and computationally
+efficient path to prediction-level uncertainty quantification in deep
+learning.
+
+\section{Simulation Studies}
+
+We evaluate the proposed approach through simulation experiments
+constructed to reflect the overparameterization of modern deep
+networks while retaining access to ground truth predictive
+distributions. Data are generated from a fixed teacher network
+$f^\star(x)$, taken to be a two–layer ReLU model with width $m$ and
+randomly drawn weights. Inputs are sampled from
+$x\sim\mathcal{N}(0,I_d)$ and responses follow
+$y\mid x \sim \mathcal{N}(f^\star(x),\sigma^2(x))$, where the variance
+is either homoskedastic, $\sigma^2(x)=\sigma_0^2$, or heteroskedastic,
+$\sigma^2(x)=\sigma_0^2\{1+\alpha \|x\|/\sqrt{d}\}^2$. The student
+network is a multilayer perceptron with width $M\gg m$ and depth $L$,
+so that the number of parameters $p$ reaches into the millions.
+Training is carried out by stochastic gradient descent or Adam with
+early stopping, closely matching practical conditions. By design, the
+conditional distribution of $y\mid x$ is known, enabling direct
+evaluation of interval coverage in settings with high $p$ and moderate
+sample size $n$.
+
+
+After fitting the student model, prediction-level multiplier bootstrap
+replicates are generated using the adjoint or forward computational
+strategies from Section~4. For each test input $x$, we compute
+bootstrap predictions $\{f(x;\hat\theta^{*(b)})\}_{b=1}^B$ and form
+either normal-approximation intervals, based on the estimated variance
+\[
+  \widehat v_{\mathrm{pred}}(x) =
+  \widehat v_{\mathrm{epi}}(x) + \sigma^2(x),
+\]
+or empirical quantile intervals obtained by adding noise
+$\epsilon_b(x)\sim\mathcal{N}(0,\sigma^2(x))$ to the replicates. The
+performance of these intervals is assessed on an independent test set
+by computing empirical coverage at nominal levels, average interval
+length as a measure of sharpness, and calibration curves based on
+predicted probabilities. Experimental factors varied include training
+sample size $n$, input dimension $d$, noise level $\sigma_0$,
+heteroskedasticity parameter $\alpha$, network width $M$ and depth $L$,
+and teacher–student mismatch in activation functions. Comparisons are
+made against baselines such as Monte Carlo dropout and deep ensembles,
+providing context for both statistical validity and computational
+efficiency.
+
+
+\section{Application}
+
+\section{Discussion}
 
 
 
