@@ -379,23 +379,9 @@ avoid forming or inverting $H(\hat{\theta})$ explicitly.
 
 \section{Scalability and Computation}
 
-Implementing the multiplier bootstrap for deep learning requires
-efficient ways to approximate the sandwich variance in
-\eqref{eq:sandwich}. Recall that the variance of a prediction functional
-is
-\[
-\operatorname{Var}\{T(\hat{\theta})\}\approx
-G(\hat{\theta})H(\hat{\theta})^{-1}\Sigma(\hat{\theta})
-H(\hat{\theta})^{-T}G(\hat{\theta})^\top,
-\]
-where $G(\hat{\theta})$ is the gradient of the functional,
-$H(\hat{\theta})$ the empirical Hessian, and $\Sigma(\hat{\theta})$ the
-covariance of the score contributions. In practice, $\Sigma$ is
-implicitly incorporated through repeated multiplier perturbations
-$g_n^*(b)$, and the computational bottleneck becomes evaluating
-$H(\hat{\theta})^{-1} g_n^*(b)$ in very high dimensions.
-
-
+The computational challenge comes from the evaluation of
+$H(\hat{\theta})^{-1}g_n^*$ when the dimension of $\theta$ is high
+like in deep learning settings.
 Direct inversion of $H(\hat{\theta})$ is impossible since $p$ reaches
 millions in modern networks. A scalable alternative is to use
 Hessian–vector products (HVPs). For any vector $v \in \mathbb{R}^p$,
