@@ -367,6 +367,24 @@ providing context for both statistical validity and computational
 efficiency.
 
 
+To summarize results, we report marginal and conditional coverage at
+nominal $90\%$ and $95\%$ levels, average interval length, and wall-
+clock compute, alongside calibration diagnostics. Conditional coverage
+is stratified by $\|x\|$, by $f^\star(x)$, and by noise level bins to
+reveal heterogeneity under heteroskedasticity. We include ablations on
+solver tolerance and iteration cap $(K)$, mini-batch size for forming
+$g^{*}$, number of replicates $(B)$, and the choice of multiplier law,
+to assess robustness–efficiency trade-offs. Baselines (MC dropout,
+deep ensembles, and a last-layer Laplace approximation) are run under
+matched training budgets. We expect multiplier-bootstrap intervals to
+track nominal coverage closely across regimes, with mild under- or
+over-coverage when teacher–student mismatch is severe or $n$ is small,
+and to produce shorter intervals than baselines at comparable compute.
+We also anticipate stable conditional coverage across $\|x\|$ bins
+once heteroskedastic variance is incorporated, demonstrating that the
+method delivers calibrated, sharp prediction intervals in the
+overparameterized setting.
+
 \section{Application}
 
 \section{Discussion}
