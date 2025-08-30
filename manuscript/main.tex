@@ -255,73 +255,190 @@ estimating equations in neural networks naturally connects to
 multiplier resampling, and how this connection can be exploited to
 develop practical procedures for uncertainty quantification.
 
+
+\section{Multiplier Bootstrap with Deep Learning}
+
+The multiplier bootstrap provides an efficient approximation to the
+distribution of functionals defined through estimating equations. Let
+$\hat{\theta}$ solve
+\begin{equation}
+g_n(\theta)=\frac{1}{n}\sum_{i=1}^n g(x_i,y_i;\theta)=0,
+\label{eq:estimating}
+\end{equation}
+where $g(x_i,y_i;\theta)$ is the score contribution of observation $i$.
+For a differentiable functional $T(\theta)$, the asymptotic variance
+has the sandwich form
+\begin{equation}
+\operatorname{Var}\{T(\hat{\theta})\}\approx
+G(\hat{\theta})\,H(\hat{\theta})^{-1}\,
+\Sigma(\hat{\theta})\,H(\hat{\theta})^{-T}\,G(\hat{\theta})^\top,
+\label{eq:sandwich}
+\end{equation}
+where $G(\hat{\theta})=\nabla_\theta T(\hat{\theta})$ and
+$H(\hat{\theta})=\nabla_\theta g_n(\hat{\theta})$. Here
+$\Sigma(\hat{\theta})=\operatorname{Var}\{g(x_i,y_i;\hat{\theta})\}$,
+with the empirical counterpart
+\begin{equation}
+\widehat{\Sigma}(\hat{\theta})=
+\frac{1}{n}\sum_{i=1}^n g(x_i,y_i;\hat{\theta})
+\,g(x_i,y_i;\hat{\theta})^\top.
+\label{eq:Sigmahat}
+\end{equation}
+Instead of re-estimating $\theta$ on resampled data, the multiplier
+bootstrap perturbs the score with i.i.d.\ multipliers
+$\{\xi_i\}_{i=1}^n$ satisfying $\mathbb{E}(\xi_i)=0$ and
+$\operatorname{Var}(\xi_i)=1$,
+\begin{equation}
+g_n^*=\frac{1}{n}\sum_{i=1}^n \xi_i\,g(x_i,y_i;\hat{\theta}),
+\label{eq:multiplier}
+\end{equation}
+and uses the linear expansion
+\begin{equation}
+\Delta T^*\approx G(\hat{\theta})\,H(\hat{\theta})^{-1}\,g_n^*,
+\label{eq:linear}
+\end{equation}
+whose distribution consistently mimics that of
+$T(\hat{\theta})-\mathbb{E}\{T(\hat{\theta})\}$ and reproduces the
+sandwich variance in \eqref{eq:sandwich}.
+
+
+In deep learning, the same structure arises from empirical risk
+minimization. Given data $\{(x_i,y_i)\}_{i=1}^n$ and a network
+$f(x;\theta)$, training minimizes
+\begin{equation}
+L_n(\theta)=\frac{1}{n}\sum_{i=1}^n
+\ell\{y_i,f(x_i;\theta)\},
+\label{eq:loss}
+\end{equation}
+so that \eqref{eq:estimating} holds with
+$g(x_i,y_i;\theta)=\nabla_\theta \ell\{y_i,f(x_i;\theta)\}$. Prediction
+at a new input $x_0$ is the functional
+\begin{equation}
+T(\theta;x_0)=f(x_0;\theta).
+\label{eq:functional}
+\end{equation}
+For replicate index $b=1,\dots,B$, multipliers
+$\{\xi_i^{(b)}\}$ produce $g_n^*(b)$ via \eqref{eq:multiplier}, and the
+prediction replicate is
+\begin{equation}
+T\bigl(\hat{\theta}^*(b);x_0\bigr)
+= T(\hat{\theta};x_0)+\Delta T^*(b),
+\label{eq:replicate}
+\end{equation}
+with $\Delta T^*(b)$ given by \eqref{eq:linear}. The dispersion of
+$\{T(\hat{\theta}^*(b);x_0)\}_{b=1}^B$ yields a bootstrap estimate of
+the sandwich variance in \eqref{eq:sandwich} specialized to
+\eqref{eq:functional}.
+
+
+For regression, we combine the epistemic component estimated from the
+replicates with an aleatoric term at $x_0$. Let
+$\widehat{v}_{\mathrm{epi}}(x_0)$ be the sample variance of
+$\{T(\hat{\theta}^*(b);x_0)\}_{b=1}^B$ and
+$\hat{\sigma}^2(x_0)$ an estimate of the conditional noise variance.
+A normal-approximation interval is
+\begin{equation}
+I_\alpha(x_0)=
+\hat{T}(x_0)\pm z_{\alpha/2}\,
+\bigl\{\widehat{v}_{\mathrm{epi}}(x_0)
++\hat{\sigma}^2(x_0)\bigr\}^{1/2},
+\label{eq:reg_interval}
+\end{equation}
+while an empirical alternative uses the $\alpha/2$ and
+$1-\alpha/2$ quantiles of
+$\{T(\hat{\theta}^*(b);x_0)+\epsilon_b(x_0)\}$ with
+$\epsilon_b(x_0)\sim \mathcal{N}\{0,\hat{\sigma}^2(x_0)\}$. For
+classification, the replicates induce predictive probability vectors,
+from which confidence scores or set-valued predictions are obtained by
+thresholding their empirical distribution.
+
+\begin{algorithm}[t]
+\caption{Multiplier Bootstrap for Deep Learning Predictions}
+\begin{algorithmic}[1]
+\STATE Train the network to obtain $\hat{\theta}$ by minimizing
+$L_n(\theta)$ in \eqref{eq:loss}.
+\FOR{$b=1,\dots,B$}
+  \STATE Generate multipliers $\{\xi_i^{(b)}\}_{i=1}^n$.
+  \STATE Compute $g_n^*(b)$ as in \eqref{eq:multiplier}.
+  \STATE Evaluate $\Delta T^*(b)$ via \eqref{eq:linear}.
+  \STATE Form $T\bigl(\hat{\theta}^*(b);x_0\bigr)$ using
+  \eqref{eq:replicate}.
+\ENDFOR
+\STATE Aggregate replicates to estimate variance, intervals, or
+predictive sets as in \eqref{eq:sandwich} and \eqref{eq:reg_interval}.
+\end{algorithmic}
+\end{algorithm}
+
+This formulation embeds multiplier bootstrap inference within deep
+networks and produces prediction-level replicates that combine epistemic
+and aleatoric effects in a principled way. The main computational
+difficulty is evaluating $H(\hat{\theta})^{-1}g_n^*$ at scale; the next
+section develops Hessian–vector product–based iterative solvers that
+avoid forming or inverting $H(\hat{\theta})$ explicitly.
+
+
 \section{Scalability and Computation}
 
 Implementing the multiplier bootstrap for deep learning requires
-scalable ways to approximate the functional expansion
+efficient ways to approximate the sandwich variance in
+\eqref{eq:sandwich}. Recall that the variance of a prediction functional
+is
 \[
-  \Delta T^{*} \approx
-  G(\hat\theta)\,H(\hat\theta)^{-1}\,g^{*},
+\operatorname{Var}\{T(\hat{\theta})\}\approx
+G(\hat{\theta})H(\hat{\theta})^{-1}\Sigma(\hat{\theta})
+H(\hat{\theta})^{-T}G(\hat{\theta})^\top,
 \]
-where $G(\hat\theta)=\nabla_\theta T(\hat\theta)$ is the gradient of
-the functional of interest and $g^{*}$ is the multiplier perturbation
-of the score. Direct computation is infeasible: the Hessian
-$H(\hat\theta)$ has dimension $p \times p$, with $p$ in the millions
-for modern networks, and cannot be formed or inverted explicitly.
+where $G(\hat{\theta})$ is the gradient of the functional,
+$H(\hat{\theta})$ the empirical Hessian, and $\Sigma(\hat{\theta})$ the
+covariance of the score contributions. In practice, $\Sigma$ is
+implicitly incorporated through repeated multiplier perturbations
+$g_n^*(b)$, and the computational bottleneck becomes evaluating
+$H(\hat{\theta})^{-1} g_n^*(b)$ in very high dimensions.
 
 
-A practical alternative is to exploit Hessian--vector products (HVPs).
-For any vector $v\in\mathbb{R}^p$,
+Direct inversion of $H(\hat{\theta})$ is impossible since $p$ reaches
+millions in modern networks. A scalable alternative is to use
+Hessian–vector products (HVPs). For any vector $v \in \mathbb{R}^p$,
 \[
-  H(\hat\theta) v =
-  \nabla^2_\theta L_n(\hat\theta)\,v
+H(\hat{\theta})v = \nabla_\theta^2 L_n(\hat{\theta})\,v,
 \]
-can be computed efficiently by automatic differentiation at a cost
-comparable to a single gradient evaluation. This makes it possible to
-apply iterative solvers that require only matrix–vector products,
-without ever constructing $H(\hat\theta)$.
+which can be computed by automatic differentiation at a cost comparable
+to a single gradient evaluation. This enables iterative solvers that
+require only matrix–vector products, without ever forming or inverting
+$H(\hat{\theta})$ explicitly.
 
 
-Two complementary strategies are available. In the \emph{adjoint
-approach}, one solves
+Two strategies are available. In the \emph{adjoint approach}, one solves
 \[
-  H(\hat\theta) u = G(\hat\theta)^\top
+H(\hat{\theta})u = G(\hat{\theta})^\top
 \]
-for $u$ using conjugate gradient with HVPs. Then each bootstrap
-replicate reduces to a single inner product,
+for $u$ using conjugate gradient with HVPs. Then each bootstrap replicate
+is evaluated by
 \[
-  \Delta T^{*(b)} \approx u^\top g^{*(b)}.
+\Delta T^*(b) \approx u^\top g_n^*(b),
 \]
-This amortizes the cost of the CG solve across all replicates. In the
-\emph{forward approach}, one instead solves
+so the cost of solving is amortized once across all replicates. In the
+\emph{forward approach}, one solves
 \[
-  H(\hat\theta) v^{*(b)} = g^{*(b)},
+H(\hat{\theta})v^*(b) = g_n^*(b),
 \]
-and evaluates
-$\Delta T^{*(b)} = G(\hat\theta)^\top v^{*(b)}$. Although this requires
-a new CG solve per replicate, it avoids the need to compute
-$G(\hat\theta)$ explicitly when that gradient is very large.
+and sets $\Delta T^*(b)=G(\hat{\theta})^\top v^*(b)$. This requires a
+new conjugate gradient solve per replicate but avoids explicit
+computation of $G(\hat{\theta})$ when it is high dimensional.
 
 
-All necessary ingredients are already available in deep learning
-frameworks. Gradients of predictions with respect to parameters give
-$G(\hat\theta)$, while HVPs are standard operations in automatic
-differentiation. The score perturbations $g^{*(b)}$ can be formed at
-the mini-batch level by assigning multipliers to observations within
-each batch, ensuring scalability to large datasets. Thus no new
-primitives are needed beyond what is already used for training.
-
-
-The computational complexity depends on the number of CG iterations,
-say $K$. The adjoint approach requires $O(K \cdot C_{\text{HVP}})$
-work once, followed by inexpensive inner products for each replicate,
-while the forward approach requires $O(K \cdot C_{\text{HVP}})$ per
-replicate. In either case, this cost is far smaller than training an
-ensemble or sampling a Bayesian posterior, both of which require
-multiple full passes through the data. The multiplier bootstrap
-therefore offers a statistically principled and computationally
-efficient path to prediction-level uncertainty quantification in deep
-learning.
+All required components are already available in deep learning
+frameworks. Gradients of predictions with respect to parameters provide
+$G(\hat{\theta})$, while HVPs are standard operations in autodiff. The
+perturbed scores $g_n^*(b)$ can be generated at the mini-batch level by
+assigning multipliers to observations within each batch, ensuring
+scalability to large datasets. The overall cost depends on the number of
+conjugate gradient iterations $K$: the adjoint approach requires
+$O(K\cdot C_{\text{HVP}})$ once plus cheap inner products for each
+replicate, while the forward approach requires $O(K\cdot C_{\text{HVP}})$
+per replicate. Both are dramatically more efficient than retraining
+ensembles or sampling Bayesian posteriors, yet retain the formal
+connection to the sandwich variance through multiplier resampling.
 
 \section{Simulation Studies}
 
